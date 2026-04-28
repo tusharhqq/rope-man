@@ -1,5 +1,9 @@
 # Rope Man Terminal
 
+https://github.com/user-attachments/assets/ad95acf3-99e2-4893-ab81-d6000c5bdd94
+
+
+
 Terminal-first Rope Man powered by OpenTUI.
 
 ## Run
