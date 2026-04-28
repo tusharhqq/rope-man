@@ -13,10 +13,12 @@ bun install
 bun run dev
 ```
 
-When published to npm as `ropeman`, the game can be launched with:
+From npm, the game can be launched with any of:
 
 ```bash
 bunx ropeman
+npx ropeman
+pnpm dlx ropeman
 ```
 
 ## Controls

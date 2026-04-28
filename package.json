@@ -3,17 +3,31 @@
   "version": "0.1.0",
   "description": "Rope Man as a terminal game powered by OpenTUI",
   "type": "module",
+  "packageManager": "bun@1.3.13",
   "bin": {
-    "ropeman": "./src/main.ts"
+    "ropeman": "bin/ropeman.js"
   },
   "files": [
+    "bin",
     "README.md",
     "src",
     "tsconfig.json"
   ],
   "scripts": {
     "dev": "bun src/main.ts",
+    "typecheck": "bunx tsc -p tsconfig.json --noEmit",
     "test": "bun test tests/*.test.ts"
+  },
+  "keywords": [
+    "game",
+    "terminal",
+    "tui",
+    "opentui",
+    "rope"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
   },
   "dependencies": {
     "@opentui/core": "0.1.106"
