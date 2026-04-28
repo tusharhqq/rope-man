@@ -2,23 +2,23 @@
 
 https://github.com/user-attachments/assets/ad95acf3-99e2-4893-ab81-d6000c5bdd94
 
-
-
 Terminal-first Rope Man powered by OpenTUI.
 
 ## Run
 
-```bash
-bun install
-bun run dev
-```
-
-From npm, the game can be launched with any of:
+Use the published npm package:
 
 ```bash
 bunx ropeman
 npx ropeman
 pnpm dlx ropeman
+```
+
+Or run from this repo:
+
+```bash
+bun install
+bun run dev
 ```
 
 ## Controls
@@ -42,5 +42,3 @@ bun run test
 bunx tsc -p tsconfig.json --noEmit
 bun pm pack --dry-run
 ```
-
-The browser game in `rope-man-game/` is intentionally untouched. This package ports the game feel to terminal cells rather than trying to reproduce the Canvas renderer pixel-for-pixel.
