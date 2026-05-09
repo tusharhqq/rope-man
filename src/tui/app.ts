@@ -1,130 +1,191 @@
 import { createCliRenderer, FrameBufferRenderable, type CliRenderer, type KeyEvent } from "@opentui/core"
+import { Deferred, Effect } from "effect"
 import { RopeManGame } from "../game/engine.js"
 import { parseSeedText } from "../game/seed.js"
 import { renderGame } from "./render.js"
-import { loadState, saveState } from "./storage.js"
+import { DEFAULT_STATE, StorageLive, StorageService, type StoredState } from "./storage.js"
 
 const FIXED_STEP = 1 / 60
 
-export async function runTerminalGame(): Promise<void> {
-  const stored = loadState()
-  const game = new RopeManGame(undefined, stored.bestMeters)
-  const renderer = await createCliRenderer({ exitOnCtrlC: true, targetFps: 60 })
-  renderer.start()
+export function runTerminalGame(): Promise<void> {
+  return Effect.runPromise(Effect.provide(runTerminalGameEffect, StorageLive))
+}
 
-  const frame = new FrameBufferRenderable(renderer, {
-    id: "ropeman-main",
-    width: renderer.terminalWidth,
-    height: renderer.terminalHeight,
-    position: "absolute",
-    zIndex: 1,
-  })
-  renderer.root.add(frame)
+export const runTerminalGameEffect = Effect.scoped(
+  Effect.gen(function* () {
+    const storage = yield* StorageService
+    const stored = yield* storage.load.pipe(
+      Effect.catchAll((error) =>
+        Effect.logWarning(`Could not load saved state; starting fresh (${String(error.cause)})`).pipe(
+          Effect.as({ ...DEFAULT_STATE }),
+        ),
+      ),
+    )
+    const game = new RopeManGame(undefined, stored.bestMeters)
+    const destroyed = yield* Deferred.make<void>()
+    const renderer = yield* acquireRenderer(destroyed)
+    renderer.start()
 
-  let accumulator = 0
-  let seedDraft = ""
-  let seedError = ""
-  const heldUntil = {
-    left: 0,
-    right: 0,
-    up: 0,
-    down: 0,
-  }
+    const frame = new FrameBufferRenderable(renderer, {
+      id: "ropeman-main",
+      width: renderer.terminalWidth,
+      height: renderer.terminalHeight,
+      position: "absolute",
+      zIndex: 1,
+    })
+    renderer.root.add(frame)
 
-  const persistBest = (): void => {
-    if (game.bestMeters > stored.bestMeters) {
-      stored.bestMeters = game.bestMeters
-      saveState(stored)
+    let accumulator = 0
+    let seedDraft = ""
+    let seedError = ""
+    let persistedBest = stored.bestMeters
+    let pendingBest: StoredState | null = null
+    const heldUntil = {
+      left: 0,
+      right: 0,
+      up: 0,
+      down: 0,
     }
-  }
 
-  const resizeHandler = (width: number, height: number): void => {
-    frame.frameBuffer.resize(width, height)
-    frame.width = width
-    frame.height = height
-  }
+    const markBestForPersistence = (): void => {
+      if (game.bestMeters > persistedBest) pendingBest = { bestMeters: game.bestMeters }
+    }
 
-  const keyHandler = (key: KeyEvent): void => {
-    const name = key.name
-    if (key.ctrl && name === "c") {
-      persistBest()
+    const flushBest = Effect.gen(function* () {
+      const next = pendingBest
+      if (!next) return
+      yield* storage.save(next)
+      persistedBest = next.bestMeters
+      if (pendingBest?.bestMeters === next.bestMeters) pendingBest = null
+    }).pipe(
+      Effect.catchAll((error) => Effect.logWarning(`Could not save best score (${String(error.cause)})`)),
+    )
+
+    yield* Effect.forkScoped(Effect.forever(Effect.sleep("500 millis").pipe(Effect.zipRight(flushBest))))
+    yield* Effect.addFinalizer(() => flushBest)
+
+    const resizeHandler = (width: number, height: number): void => {
+      frame.frameBuffer.resize(width, height)
+      frame.width = width
+      frame.height = height
+    }
+
+    const quit = (): void => {
+      markBestForPersistence()
       renderer.destroy()
-      return
-    }
-    if (name === "q") {
-      persistBest()
-      renderer.destroy()
-      return
     }
 
-    if (game.screen === "menu") {
-      if (name === "return" || name === "enter") {
-        if (!seedDraft) {
-          game.randomStart()
+    const keyHandler = (key: KeyEvent): void => {
+      const name = key.name
+      if (key.ctrl && name === "c") {
+        quit()
+        return
+      }
+      if (name === "q") {
+        quit()
+        return
+      }
+
+      if (game.screen === "menu") {
+        if (name === "return" || name === "enter") {
+          if (!seedDraft) {
+            game.randomStart()
+            return
+          }
+          const parsed = parseSeedText(seedDraft)
+          if (parsed.value == null) {
+            seedError = parsed.error
+          } else {
+            seedDraft = ""
+            seedError = ""
+            game.start(parsed.value)
+          }
           return
         }
-        const parsed = parseSeedText(seedDraft)
-        if (parsed.value == null) {
-          seedError = parsed.error
-        } else {
-          seedDraft = ""
+        if (name === "backspace" || name === "delete") {
+          seedDraft = seedDraft.slice(0, -1)
           seedError = ""
-          game.start(parsed.value)
+          return
+        }
+        if (key.sequence && /^[0-9a-zA-Z]$/.test(key.sequence) && seedDraft.length < 6) {
+          seedDraft += key.sequence
+          seedError = ""
         }
         return
       }
-      if (name === "backspace" || name === "delete") {
-        seedDraft = seedDraft.slice(0, -1)
-        seedError = ""
+
+      if (name === "escape") {
+        game.togglePause()
         return
       }
-      if (key.sequence && /^[0-9a-zA-Z]$/.test(key.sequence) && seedDraft.length < 6) {
-        seedDraft += key.sequence
-        seedError = ""
+      if (name === "h") {
+        markBestForPersistence()
+        game.returnToMenu()
+        return
       }
-      return
+      if (name === "r") {
+        game.start()
+        return
+      }
+      if (name === "space") {
+        game.action()
+        return
+      }
+
+      setInput(game, name, true, heldUntil)
     }
 
-    if (name === "escape") {
-      game.togglePause()
-      return
-    }
-    if (name === "h") {
-      persistBest()
-      game.returnToMenu()
-      return
-    }
-    if (name === "r") {
-      game.start()
-      return
-    }
-    if (name === "space") {
-      game.action()
-      return
+    const keyReleaseHandler = (key: KeyEvent): void => {
+      setInput(game, key.name, false, heldUntil)
     }
 
-    setInput(game, name, true, heldUntil)
-  }
-
-  const keyReleaseHandler = (key: KeyEvent): void => {
-    setInput(game, key.name, false, heldUntil)
-  }
-
-  renderer.on("resize", resizeHandler)
-  renderer.keyInput.on("keypress", keyHandler)
-  renderer.keyInput.on("keyrelease", keyReleaseHandler)
-
-  renderer.setFrameCallback(async (deltaMs: number) => {
-    expireInputs(game, heldUntil)
-    accumulator += Math.min(deltaMs / 1000, 0.1)
-    while (accumulator >= FIXED_STEP) {
-      const beforeBest = game.bestMeters
-      game.update(FIXED_STEP)
-      if (game.bestMeters > beforeBest) persistBest()
-      accumulator -= FIXED_STEP
+    const frameCallback = (deltaMs: number): Promise<void> => {
+      expireInputs(game, heldUntil)
+      accumulator += Math.min(deltaMs / 1000, 0.1)
+      while (accumulator >= FIXED_STEP) {
+        const beforeBest = game.bestMeters
+        game.update(FIXED_STEP)
+        if (game.bestMeters > beforeBest) markBestForPersistence()
+        accumulator -= FIXED_STEP
+      }
+      renderGame(frame.frameBuffer, game, { seedDraft, seedError })
+      return Promise.resolve()
     }
-    renderGame(frame.frameBuffer, game, { seedDraft, seedError })
-  })
+
+    renderer.on("resize", resizeHandler)
+    renderer.keyInput.on("keypress", keyHandler)
+    renderer.keyInput.on("keyrelease", keyReleaseHandler)
+    renderer.setFrameCallback(frameCallback)
+
+    yield* Effect.addFinalizer(() =>
+      Effect.sync(() => {
+        renderer.off("resize", resizeHandler)
+        renderer.keyInput.off("keypress", keyHandler)
+        renderer.keyInput.off("keyrelease", keyReleaseHandler)
+        renderer.removeFrameCallback(frameCallback)
+      }),
+    )
+
+    yield* Deferred.await(destroyed)
+  }),
+)
+
+function acquireRenderer(destroyed: Deferred.Deferred<void>) {
+  return Effect.acquireRelease(
+    Effect.promise(() =>
+      createCliRenderer({
+        exitOnCtrlC: true,
+        targetFps: 60,
+        onDestroy: () => {
+          Effect.runFork(Deferred.succeed(destroyed, undefined))
+        },
+      }),
+    ),
+    (renderer) =>
+      Effect.sync(() => {
+        if (!renderer.isDestroyed) renderer.destroy()
+      }),
+  )
 }
 
 type HeldUntil = Record<"left" | "right" | "up" | "down", number>
