@@ -1,6 +1,6 @@
 {
   "name": "ropeman",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Rope Man as a terminal game powered by OpenTUI",
   "type": "module",
   "packageManager": "bun@1.3.13",
