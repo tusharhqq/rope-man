@@ -1,10 +1,6 @@
 # Rope Man
 
-
-
 https://github.com/user-attachments/assets/266611a8-15a7-402b-a400-20ba5ec8a2d5
-
-
 
 Terminal Rope Man game powered by OpenTUI.
 

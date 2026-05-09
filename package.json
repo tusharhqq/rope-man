@@ -2,8 +2,14 @@
   "name": "ropeman",
   "version": "0.1.5",
   "description": "Rope Man as a terminal game powered by OpenTUI",
-  "type": "module",
-  "packageManager": "bun@1.3.13",
+  "keywords": [
+    "game",
+    "opentui",
+    "rope",
+    "terminal",
+    "tui"
+  ],
+  "license": "MIT",
   "bin": {
     "ropeman": "bin/ropeman.js"
   },
@@ -13,30 +19,34 @@
     "src",
     "tsconfig.json"
   ],
-  "scripts": {
-    "dev": "bun src/main.ts",
-    "typecheck": "bunx tsc -p tsconfig.json --noEmit",
-    "test": "bun test tests/*.test.ts"
-  },
-  "keywords": [
-    "game",
-    "terminal",
-    "tui",
-    "opentui",
-    "rope"
-  ],
-  "license": "MIT",
+  "type": "module",
   "publishConfig": {
     "access": "public"
+  },
+  "scripts": {
+    "dev": "bun src/main.ts",
+    "knip": "knip",
+    "typecheck": "bunx tsc -p tsconfig.json --noEmit",
+    "test": "bun test tests/*.test.ts",
+    "lint": "oxlint .",
+    "lint:fix": "oxlint --fix .",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check ."
   },
   "dependencies": {
     "@opentui/core": "^0.2.6",
     "effect": "3.21.2"
   },
   "devDependencies": {
-    "@types/bun": "1.3.13"
+    "@types/bun": "1.3.13",
+    "@types/node": "^25.6.2",
+    "knip": "^6.12.2",
+    "oxfmt": "^0.48.0",
+    "oxlint": "^1.63.0",
+    "typescript": "^6.0.3"
   },
   "engines": {
     "bun": ">=1.3.0"
-  }
+  },
+  "packageManager": "bun@1.3.13"
 }
