@@ -1,3 +1,7 @@
 opentui
 rope-man-game
 node_modules
+
+# Local/temp files
+temp/
+.DS_Store
