@@ -30,7 +30,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@opentui/core": "0.2.6",
+    "@opentui/core": "^0.2.6",
     "effect": "3.21.2"
   },
   "devDependencies": {
